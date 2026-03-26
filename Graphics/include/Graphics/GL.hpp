@@ -8,6 +8,9 @@
 #ifdef _WIN32
 #include <GL/glew.h>
 #include <GL/wglew.h>
+#elif defined(USC_IOS)
+#include <OpenGLES/ES3/gl.h>
+#include <OpenGLES/ES3/glext.h>
 #elif __APPLE__
 #include <OpenGL/gl3.h>
 #include <OpenGL/gl3ext.h>
@@ -20,4 +23,3 @@
 #include <GL/glew.h>
 #include <GL/glxew.h>
 #endif
-

@@ -75,8 +75,12 @@ namespace Graphics
 			SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 2);
 			SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
 
+			uint32 windowFlags = SDL_WINDOW_OPENGL;
+#ifndef USC_IOS
+			windowFlags |= SDL_WINDOW_RESIZABLE;
+#endif
 			m_window = SDL_CreateWindow(*titleUtf8, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-										m_clntSize.x, m_clntSize.y, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+										m_clntSize.x, m_clntSize.y, windowFlags);
 			assert(m_window);
 
 			uint32 numJoysticks = SDL_NumJoysticks();

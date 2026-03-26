@@ -665,6 +665,7 @@ void __discordError(int errorCode, const char *message)
 	g_application->DiscordError(errorCode, message);
 }
 
+#ifndef USC_IOS
 void __discordReady(const DiscordUser *user)
 {
 	Logf("[Discord] Logged in as \"%s\"", Logger::Severity::Info, user->username);
@@ -687,6 +688,7 @@ void __discordDisconnected(int errcode, const char *msg)
 {
 	g_application->DiscordError(errcode, msg);
 }
+#endif
 
 void __updateChecker()
 {
@@ -840,6 +842,7 @@ void Application::CheckForUpdate()
 
 void Application::m_InitDiscord()
 {
+#ifndef USC_IOS
 	ProfilerScope $("Discord RPC Init");
 	DiscordEventHandlers dhe;
 	memset(&dhe, 0, sizeof(dhe));
@@ -850,6 +853,7 @@ void Application::m_InitDiscord()
 	dhe.joinGame = __discordJoinGame;
 	dhe.disconnected = __discordDisconnected;
 	Discord_Initialize(DISCORD_APPLICATION_ID, &dhe, 1, nullptr);
+#endif
 }
 
 void Application::m_InitLightPlugins()
@@ -1278,7 +1282,9 @@ void Application::m_MainLoop()
 		m_appTime = appTimer.SecondsAsFloat();
 		m_frameTimer.Restart();
 		//run discord callbacks
+#ifndef USC_IOS
 		Discord_RunCallbacks();
+#endif
 
 		// Process changes in the list of items
 		bool restoreTop = false;
@@ -1619,7 +1625,9 @@ void Application::m_Cleanup()
 
 	m_fonts.clear();
 
+#ifndef USC_IOS
 	Discord_Shutdown();
+#endif
 
 #ifdef EMBEDDED
 	nvgDeleteGLES2(g_guiState.vg);
@@ -2003,11 +2011,17 @@ void Application::DisposeLua(lua_State *state)
 
 void Application::DiscordError(int errorCode, const char *message)
 {
+#ifdef USC_IOS
+	(void)errorCode;
+	(void)message;
+#else
 	Logf("[Discord] %s", Logger::Severity::Warning, message);
+#endif
 }
 
 void Application::DiscordPresenceMenu(String name)
 {
+#ifndef USC_IOS
 	DiscordRichPresence discordPresence;
 	memset(&discordPresence, 0, sizeof(discordPresence));
 	discordPresence.state = "In Menus";
@@ -2019,10 +2033,14 @@ void Application::DiscordPresenceMenu(String name)
 	discordPresence.partyId = *m_multiRoomId;
 
 	Discord_UpdatePresence(&discordPresence);
+#else
+	(void)name;
+#endif
 }
 
 void Application::DiscordPresenceMulti(String secret, int partySize, int partyMax, String id)
 {
+#ifndef USC_IOS
 	DiscordRichPresence discordPresence;
 	memset(&discordPresence, 0, sizeof(discordPresence));
 
@@ -2040,10 +2058,17 @@ void Application::DiscordPresenceMulti(String secret, int partySize, int partyMa
 	discordPresence.partyId = *m_multiRoomId;
 
 	Discord_UpdatePresence(&discordPresence);
+#else
+	(void)secret;
+	(void)partySize;
+	(void)partyMax;
+	(void)id;
+#endif
 }
 
 void Application::DiscordPresenceSong(const BeatmapSettings &song, int64 startTime, int64 endTime)
 {
+#ifndef USC_IOS
 	Vector<String> diffNames = {"NOV", "ADV", "EXH", "INF"};
 	DiscordRichPresence discordPresence;
 	memset(&discordPresence, 0, sizeof(discordPresence));
@@ -2072,6 +2097,11 @@ void Application::DiscordPresenceSong(const BeatmapSettings &song, int64 startTi
 	discordPresence.partyId = *m_multiRoomId;
 
 	Discord_UpdatePresence(&discordPresence);
+#else
+	(void)song;
+	(void)startTime;
+	(void)endTime;
+#endif
 }
 
 void Application::JoinMultiFromInvite(String secret)

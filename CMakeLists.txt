@@ -106,11 +106,21 @@ add_definitions(-DUNICODE -D_UNICODE)
 #https://stackoverflow.com/questions/60041896/reuse-target-compile-options-from-variable-for-multiple-targets-cmake/60047012#60047012
 add_library(cc-common INTERFACE)
 
+set(USC_IOS OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_OSX_SYSROOT MATCHES "iphoneos|iphonesimulator")
+    set(USC_IOS ON)
+    message("Configuring USC for iOS")
+    target_compile_definitions(cc-common INTERFACE USC_IOS=1)
+endif()
+
 if(WIN32)
     target_compile_options(cc-common INTERFACE /Zi)
 endif()
 
 OPTION(EMBEDDED "Enable embedded build" OFF)
+if(USC_IOS)
+    set(EMBEDDED ON CACHE BOOL "Enable embedded build" FORCE)
+endif()
 
 if(EMBEDDED)
 	message("Enabling embedded build")
