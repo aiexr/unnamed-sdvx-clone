@@ -6,6 +6,17 @@
 
 namespace Graphics
 {
+	struct TouchEvent
+	{
+		SDL_TouchID touchId = 0;
+		SDL_FingerID fingerId = 0;
+		float x = 0.0f;
+		float y = 0.0f;
+		float dx = 0.0f;
+		float dy = 0.0f;
+		float pressure = 0.0f;
+	};
+
 	/// Windowed or bordered window style
 	enum class WindowStyle
 	{
@@ -157,6 +168,9 @@ namespace Graphics
 		Delegate<MouseButton> OnMousePressed;
 		Delegate<MouseButton> OnMouseReleased;
 		Delegate<int32, int32> OnMouseMotion;
+		Delegate<const TouchEvent&> OnTouchPressed;
+		Delegate<const TouchEvent&> OnTouchReleased;
+		Delegate<const TouchEvent&> OnTouchMoved;
 		Delegate<SDL_Event> OnAnyEvent;
 		// Mouse scroll wheel 
 		//	Positive for scroll down

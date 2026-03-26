@@ -16,10 +16,14 @@ void Input::Init(Graphics::Window& wnd)
 	m_window->OnKeyPressed.Add(this, &Input::OnKeyPressed);
 	m_window->OnKeyReleased.Add(this, &Input::OnKeyReleased);
 	m_window->OnMouseMotion.Add(this, &Input::OnMouseMotion);
+	m_window->OnTouchPressed.Add(this, &Input::OnTouchPressed);
+	m_window->OnTouchReleased.Add(this, &Input::OnTouchReleased);
+	m_window->OnTouchMoved.Add(this, &Input::OnTouchMoved);
 
 
 	m_lastMousePos[0] = m_window->GetMousePos().x;
 	m_lastMousePos[1] = m_window->GetMousePos().y;
+	m_touchInputEnabled = SDL_GetNumTouchDevices() > 0;
 
 	m_laserDevice = g_gameConfig.GetEnum<Enum_InputDevice>(GameConfigKeys::LaserInputDevice);
 	m_buttonDevice = g_gameConfig.GetEnum<Enum_InputDevice>(GameConfigKeys::ButtonInputDevice);
@@ -120,8 +124,12 @@ void Input::Cleanup()
 		m_window->OnKeyPressed.RemoveAll(this);
 		m_window->OnKeyReleased.RemoveAll(this);
 		m_window->OnMouseMotion.RemoveAll(this);
+		m_window->OnTouchPressed.RemoveAll(this);
+		m_window->OnTouchReleased.RemoveAll(this);
+		m_window->OnTouchMoved.RemoveAll(this);
 		m_window = nullptr;
 	}
+	m_ResetTouchState();
 }
 
 void Input::Update(float deltaTime)
@@ -214,6 +222,19 @@ void Input::Update(float deltaTime)
 					m_laserStates[i] = delta * m_controllerSensitivity;
 				}
 				m_prevLaserStates[i] = axisState;
+			}
+		}
+	}
+
+	if(m_touchInputEnabled)
+	{
+		for(uint32 i = 0; i < 2; i++)
+		{
+			if(m_touchLaserPixels[i] != 0.0f)
+			{
+				m_rawLaserStates[i] += m_touchLaserPixels[i];
+				m_laserStates[i] += m_touchLaserPixels[i] * m_mouseSensitivity;
+				m_touchLaserPixels[i] = 0.0f;
 			}
 		}
 	}
@@ -471,4 +492,136 @@ void Input::OnMouseMotion(int32 x, int32 y)
 {
 	m_mousePos[0] += x;
 	m_mousePos[1] += y;
+}
+
+void Input::OnTouchPressed(const Graphics::TouchEvent& touch)
+{
+	m_touchInputEnabled = true;
+
+	if(m_touchContacts.Contains(touch.fingerId))
+		return;
+
+	const TouchZone zone = m_GetTouchZone(touch);
+	if(zone == TouchZone::None)
+		return;
+
+	m_touchContacts.Add(touch.fingerId, TouchContact { zone });
+	const Button button = m_GetTouchZoneButton(zone);
+	if(button != Button::Length)
+	{
+		m_SetTouchButtonState(button, true, 0);
+	}
+}
+
+void Input::OnTouchReleased(const Graphics::TouchEvent& touch)
+{
+	auto* contact = m_touchContacts.Find(touch.fingerId);
+	if(!contact)
+		return;
+
+	const Button button = m_GetTouchZoneButton(contact->zone);
+	if(button != Button::Length)
+	{
+		m_SetTouchButtonState(button, false, 0);
+	}
+	m_touchContacts.erase(touch.fingerId);
+}
+
+void Input::OnTouchMoved(const Graphics::TouchEvent& touch)
+{
+	auto* contact = m_touchContacts.Find(touch.fingerId);
+	if(!contact || !m_window)
+		return;
+
+	if(contact->zone == TouchZone::LaserLeft || contact->zone == TouchZone::LaserRight)
+	{
+		const uint32 laserIndex = contact->zone == TouchZone::LaserLeft ? 0 : 1;
+		const float windowWidth = static_cast<float>(Math::Max(1, m_window->GetWindowSize().x));
+		m_touchLaserPixels[laserIndex] += touch.dx * windowWidth;
+	}
+}
+
+void Input::m_ResetTouchState()
+{
+	for(size_t i = 0; i < (size_t)Button::Length; i++)
+	{
+		if(m_touchButtonCounts[i] > 0)
+		{
+			m_touchButtonCounts[i] = 0;
+			m_OnButtonInput((Button)i, false, 0);
+		}
+	}
+	m_touchContacts.clear();
+	m_touchLaserPixels[0] = 0.0f;
+	m_touchLaserPixels[1] = 0.0f;
+}
+
+void Input::m_SetTouchButtonState(Button button, bool pressed, int32 delta)
+{
+	int32& count = m_touchButtonCounts[(size_t)button];
+	if(pressed)
+	{
+		count++;
+		if(count == 1)
+		{
+			m_OnButtonInput(button, true, delta);
+		}
+	}
+	else if(count > 0)
+	{
+		count--;
+		if(count == 0)
+		{
+			m_OnButtonInput(button, false, delta);
+		}
+	}
+}
+
+Input::TouchZone Input::m_GetTouchZone(const Graphics::TouchEvent& touch) const
+{
+	// Portrait-first layout:
+	// top 52% = lasers split left/right
+	// middle 26% = four BT lanes
+	// bottom 22% = FX split left/right
+	if(touch.y >= 0.78f)
+	{
+		return touch.x < 0.5f ? TouchZone::FXLeft : TouchZone::FXRight;
+	}
+	if(touch.y >= 0.52f)
+	{
+		const int btIndex = Math::Clamp<int>(static_cast<int>(touch.x * 4.0f), 0, 3);
+		switch(btIndex)
+		{
+		case 0:
+			return TouchZone::BT0;
+		case 1:
+			return TouchZone::BT1;
+		case 2:
+			return TouchZone::BT2;
+		default:
+			return TouchZone::BT3;
+		}
+	}
+	return touch.x < 0.5f ? TouchZone::LaserLeft : TouchZone::LaserRight;
+}
+
+Input::Button Input::m_GetTouchZoneButton(TouchZone zone) const
+{
+	switch(zone)
+	{
+	case TouchZone::FXLeft:
+		return Button::FX_0;
+	case TouchZone::FXRight:
+		return Button::FX_1;
+	case TouchZone::BT0:
+		return Button::BT_0;
+	case TouchZone::BT1:
+		return Button::BT_1;
+	case TouchZone::BT2:
+		return Button::BT_2;
+	case TouchZone::BT3:
+		return Button::BT_3;
+	default:
+		return Button::Length;
+	}
 }

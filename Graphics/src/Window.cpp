@@ -58,6 +58,9 @@ namespace Graphics
 		{
 			ProfilerScope $("Creating Window");
 			SDL::Main();
+			// Handle touch explicitly so iOS touches don't get duplicated as synthetic mouse input.
+			SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+			SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
 
 			m_clntSize = size;
 
@@ -362,6 +365,45 @@ namespace Graphics
 					else if (evt.type == SDL_EventType::SDL_MOUSEMOTION)
 					{
 						outer.OnMouseMotion.Call(evt.motion.xrel, evt.motion.yrel);
+					}
+					else if (evt.type == SDL_EventType::SDL_FINGERDOWN)
+					{
+						const TouchEvent touch {
+							evt.tfinger.touchId,
+							evt.tfinger.fingerId,
+							evt.tfinger.x,
+							evt.tfinger.y,
+							evt.tfinger.dx,
+							evt.tfinger.dy,
+							evt.tfinger.pressure
+						};
+						outer.OnTouchPressed.Call(touch);
+					}
+					else if (evt.type == SDL_EventType::SDL_FINGERUP)
+					{
+						const TouchEvent touch {
+							evt.tfinger.touchId,
+							evt.tfinger.fingerId,
+							evt.tfinger.x,
+							evt.tfinger.y,
+							evt.tfinger.dx,
+							evt.tfinger.dy,
+							evt.tfinger.pressure
+						};
+						outer.OnTouchReleased.Call(touch);
+					}
+					else if (evt.type == SDL_EventType::SDL_FINGERMOTION)
+					{
+						const TouchEvent touch {
+							evt.tfinger.touchId,
+							evt.tfinger.fingerId,
+							evt.tfinger.x,
+							evt.tfinger.y,
+							evt.tfinger.dx,
+							evt.tfinger.dy,
+							evt.tfinger.pressure
+						};
+						outer.OnTouchMoved.Call(touch);
 					}
 					else if (evt.type == SDL_EventType::SDL_QUIT)
 					{

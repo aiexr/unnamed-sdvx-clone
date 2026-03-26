@@ -1,5 +1,11 @@
 #pragma once
 
+namespace Graphics
+{
+	class Window;
+	struct TouchEvent;
+}
+
 // Types of input device
 DefineEnum(InputDevice,
 	Keyboard,
@@ -58,6 +64,9 @@ public:
 	virtual void OnKeyPressed(SDL_Scancode code, int32 delta);
 	virtual void OnKeyReleased(SDL_Scancode code, int32 delta);
 	virtual void OnMouseMotion(int32 x, int32 y);
+	virtual void OnTouchPressed(const Graphics::TouchEvent& touch);
+	virtual void OnTouchReleased(const Graphics::TouchEvent& touch);
+	virtual void OnTouchMoved(const Graphics::TouchEvent& touch);
 
 	// Request laser input state
 	[[nodiscard]]
@@ -78,9 +87,33 @@ public:
 	Delegate<Button, int32> OnButtonReleased;
 
 private:
+	enum class TouchZone : uint8
+	{
+		None,
+		LaserLeft,
+		LaserRight,
+		FXLeft,
+		FXRight,
+		BT0,
+		BT1,
+		BT2,
+		BT3,
+	};
+
+	struct TouchContact
+	{
+		TouchZone zone = TouchZone::None;
+	};
+
 	void m_InitKeyboardMapping();
 	void m_InitControllerMapping();
 	void m_OnButtonInput(Button b, bool pressed, int32 delta);
+	void m_ResetTouchState();
+	void m_SetTouchButtonState(Button button, bool pressed, int32 delta);
+	[[nodiscard]]
+	TouchZone m_GetTouchZone(const Graphics::TouchEvent& touch) const;
+	[[nodiscard]]
+	Button m_GetTouchZoneButton(TouchZone zone) const;
 
 	void m_OnGamepadButtonPressed(uint8 button, int32 delta);
 	void m_OnGamepadButtonReleased(uint8 button, int32 delta);
@@ -115,6 +148,10 @@ private:
 	float m_mouseSensitivity;
 	int32 m_lastMousePos[2];
 	int32 m_mousePos[2];
+	float m_touchLaserPixels[2] = { 0.0f };
+	int32 m_touchButtonCounts[(size_t)Button::Length] = { 0 };
+	Map<SDL_FingerID, TouchContact> m_touchContacts;
+	bool m_touchInputEnabled = false;
 
 	// Controller bindings
 	Multimap<uint32, Button> m_controllerMap;
